@@ -19,71 +19,78 @@ die()  { printf '\033[1;31merror:\033[0m %s\n' "$1" >&2; exit 1; }
 need() { command -v "$1" >/dev/null 2>&1; }
 
 detect_platform() {
-    os="$(uname -s)"
-    arch="$(uname -m)"
+    _dp_os="$(uname -s)"
+    _dp_arch="$(uname -m)"
 
-    case "$os" in
-        Linux)   os="linux" ;;
-        Darwin)  os="darwin" ;;
-        *) die "unsupported operating system: $os (use install.ps1 on Windows)" ;;
+    case "$_dp_os" in
+        Linux)   _dp_os="linux" ;;
+        Darwin)  _dp_os="darwin" ;;
+        *) die "unsupported operating system: $_dp_os (use install.ps1 on Windows)" ;;
     esac
 
-    case "$arch" in
-        x86_64|amd64)   arch="amd64" ;;
-        aarch64|arm64)  arch="arm64" ;;
-        *) die "unsupported architecture: $arch" ;;
+    case "$_dp_arch" in
+        x86_64|amd64)   _dp_arch="amd64" ;;
+        aarch64|arm64)  _dp_arch="arm64" ;;
+        *) die "unsupported architecture: $_dp_arch" ;;
     esac
 
-    PLATFORM="${os}_${arch}"
+    PLATFORM="${_dp_os}_${_dp_arch}"
 }
 
 download() {
-    url="$1"
-    dest="$2"
+    _dl_url="$1"
+    _dl_dest="$2"
     if need curl; then
-        curl -fsSL "$url" -o "$dest"
+        curl -fsSL "$_dl_url" -o "$_dl_dest"
     elif need wget; then
-        wget -qO "$dest" "$url"
+        wget -qO "$_dl_dest" "$_dl_url"
     else
         die "either curl or wget is required"
     fi
 }
 
 fetch_stdout() {
-    url="$1"
+    _fs_url="$1"
     if need curl; then
-        curl -fsSL "$url"
+        curl -fsSL "$_fs_url"
     elif need wget; then
-        wget -qO- "$url"
+        wget -qO- "$_fs_url"
     else
         die "either curl or wget is required"
     fi
 }
 
 latest_version() {
-    fetch_stdout "https://api.github.com/repos/${REPO}/releases/latest" \
-        | grep -m1 '"tag_name"' \
+    # buffer the whole response: piping curl directly into grep -m1 closes the
+    # pipe early and makes curl exit 23
+    _lv_response="$(fetch_stdout "https://api.github.com/repos/${REPO}/releases/latest")"
+    printf '%s\n' "$_lv_response" \
+        | grep '"tag_name"' \
+        | head -n1 \
         | sed -E 's/.*"tag_name" *: *"([^"]+)".*/\1/'
 }
 
 verify_checksum() {
-    archive="$1"
-    checksums="$2"
-    name="$(basename "$archive")"
+    # note: POSIX sh has no local scope, so these are _-prefixed to avoid
+    # clobbering the caller's variables
+    _vc_archive="$1"
+    _vc_checksums="$2"
+    _vc_name="$(basename "$_vc_archive")"
 
-    expected="$(grep " $name\$" "$checksums" | awk '{print $1}' | head -n1)"
-    [ -n "$expected" ] || { warn "no checksum entry for $name, skipping verification"; return 0; }
+    _vc_expected="$(grep " $_vc_name\$" "$_vc_checksums" | awk '{print $1}' | head -n1)"
+    [ -n "$_vc_expected" ] || { warn "no checksum entry for $_vc_name, skipping verification"; return 0; }
 
     if need sha256sum; then
-        actual="$(sha256sum "$archive" | awk '{print $1}')"
+        _vc_actual="$(sha256sum "$_vc_archive" | awk '{print $1}')"
     elif need shasum; then
-        actual="$(shasum -a 256 "$archive" | awk '{print $1}')"
+        _vc_actual="$(shasum -a 256 "$_vc_archive" | awk '{print $1}')"
     else
         warn "no sha256 tool found, skipping verification"
         return 0
     fi
 
-    [ "$expected" = "$actual" ] || die "checksum mismatch for $name (expected $expected, got $actual)"
+    [ "$_vc_expected" = "$_vc_actual" ] \
+        || die "checksum mismatch for $_vc_name (expected $_vc_expected, got $_vc_actual)"
     info "checksum verified"
 }
 
