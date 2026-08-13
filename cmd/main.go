@@ -16,6 +16,13 @@ import (
 	"os"
 )
 
+// set at build time with -ldflags "-X main.version=..."
+var (
+	version = "dev"
+	commit  = "none"
+	date    = "unknown"
+)
+
 func main() {
 	args := os.Args
 	if len(args) < 2 {
@@ -23,6 +30,10 @@ func main() {
 		return
 	}
 	filename := os.Args[1]
+	if filename == "-v" || filename == "--version" {
+		fmt.Printf("kat %s (commit %s, built %s)\n", version, commit, date)
+		return
+	}
 	exists := FileExist(filename)
 	if !exists {
 		fmt.Println("file not found")

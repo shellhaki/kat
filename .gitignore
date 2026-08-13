@@ -1,2 +1,4 @@
-Releases/
 bin/
+build/
+dist/
+Releases/
