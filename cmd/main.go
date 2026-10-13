@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 )
 
 // set at build time with -ldflags "-X main.version=..."
@@ -42,7 +43,7 @@ func main() {
 		if err != nil {
 			log.Println(err.Error())
 		} else {
-			fmt.Println(content)
+			fmt.Println(strings.TrimSpace(content))
 		}
 	}
 }
